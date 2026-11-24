@@ -1,0 +1,34 @@
+name: Build Custom linesOS 1.0
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install NASM and GCC
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nasm gcc-multilib
+
+      - name: Compile Bootloader and Kernel
+        run: |
+          nasm -f bin boot.asm -o boot.bin
+          nasm -f elf32 kernel_entry.asm -o kernel_entry.o
+          gcc -m32 -ffreestanding -fno-pie -c kernel.c -o kernel.o
+          ld -m elf_i386 -o kernel.bin -Ttext 0x1000 kernel_entry.o kernel.o --oformat binary
+
+      - name: Create Raw Disk Image
+        run: |
+          cat boot.bin kernel.bin > os_raw.bin
+          dd if=/dev/zero of=linesOS-1.0.img bs=512 count=2880
+          dd if=os_raw.bin of=linesOS-1.0.img conv=notrunc
+
+      - name: Upload Disk Image
+        uses: actions/upload-artifact@v4
+        with:
+          name: linesOS-1.0-disk
+          path: linesOS-1.0.img
